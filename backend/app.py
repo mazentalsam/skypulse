@@ -1,9 +1,16 @@
+import logging
 from flask import Flask
 from flask_cors import CORS
 from flasgger import Swagger
 from backend import config
 from backend.database import init_app
 from backend.extensions import cache, limiter
+
+logging.basicConfig(
+    level=logging.DEBUG if config.FLASK_DEBUG else logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
 
 SWAGGER_TEMPLATE = {
     'info': {

@@ -71,14 +71,38 @@ def create_search():
 
 @crud_bp.route('/searches', methods=['GET'])
 def get_searches():
-    """List all saved weather searches.
+    """List saved weather searches with optional pagination.
     ---
     tags:
       - Searches
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        required: false
+        description: Page number (1-indexed). Omit for all results.
+      - name: per_page
+        in: query
+        type: integer
+        required: false
+        description: Results per page (default 20, max 100)
     responses:
       200:
-        description: Array of saved search records
+        description: Array of saved search records (with X-Total-Count header when paginated)
     """
+    page = request.args.get('page', type=int)
+    per_page = request.args.get('per_page', default=20, type=int)
+    per_page = min(max(per_page, 1), 100)
+
+    if page is not None:
+        result = models.get_searches_paginated(page, per_page)
+        resp = jsonify(result['items'])
+        resp.headers['X-Total-Count'] = str(result['total'])
+        resp.headers['X-Page'] = str(result['page'])
+        resp.headers['X-Per-Page'] = str(result['per_page'])
+        resp.headers['X-Total-Pages'] = str(result['total_pages'])
+        return resp
+
     searches = models.get_all_searches()
     return jsonify(searches)
 

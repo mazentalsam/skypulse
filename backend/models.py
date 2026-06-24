@@ -32,6 +32,26 @@ def get_all_searches():
     return [_row_to_search_dict(r) for r in rows]
 
 
+def get_searches_paginated(page, per_page):
+    import math
+    db = get_db()
+    total = db.execute('SELECT COUNT(*) FROM weather_searches').fetchone()[0]
+    total_pages = max(math.ceil(total / per_page), 1)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * per_page
+    rows = db.execute(
+        'SELECT * FROM weather_searches ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        (per_page, offset)
+    ).fetchall()
+    return {
+        'items': [_row_to_search_dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages,
+    }
+
+
 def get_search_by_id(search_id):
     db = get_db()
     row = db.execute(

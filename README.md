@@ -1,6 +1,6 @@
 # SkyPulse — AI-Powered Weather Intelligence
 
-![CI](https://github.com/YOUR_USERNAME/skypulse/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/mazentalsam/skypulse/actions/workflows/ci.yml/badge.svg)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python)
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask)
@@ -8,14 +8,12 @@
 ![Anthropic](https://img.shields.io/badge/Claude_API-Sonnet_4.6-6B4FBB?style=flat-square)
 ![OpenWeatherMap](https://img.shields.io/badge/OpenWeatherMap-API-EB6E4B?style=flat-square)
 ![Leaflet](https://img.shields.io/badge/Leaflet-Maps-199900?style=flat-square&logo=leaflet)
+![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=flat-square&logo=typescript)
 ![Tests](https://img.shields.io/badge/Tests-68_passing-34D399?style=flat-square)
+![Playwright](https://img.shields.io/badge/E2E-Playwright-2EAD33?style=flat-square&logo=playwright)
 
 A full-stack weather platform that combines real-time forecasts with Claude AI insights — built by **Mazen** for the **PM Accelerator AI Engineer Intern** technical assessment. Covers **both** Tech Assessment #1 (Frontend) and #2 (Backend) for Full Stack candidacy.
 
-<!-- Replace with an actual screenshot after deployment -->
-![SkyPulse Screenshot](https://via.placeholder.com/1200x630/070809/ededee?text=SkyPulse+—+Replace+With+Real+Screenshot)
-
-**Live demo:** _Deploy via Docker, Railway, or Render (configs included)_
 **API docs:** `http://localhost:5000/docs` (Swagger UI via Flasgger)
 
 ---
@@ -90,7 +88,8 @@ Open **http://localhost:5173** — the app works immediately with realistic demo
 | **CRUD operations**           | Full create/read/update/delete for searches + alerts       | `backend/routes/crud.py`, `backend/models.py` |
 | **Database**                  | SQLite with WAL mode, 3 tables, demo seed data             | `backend/database.py`                   |
 | **Data validation**           | Input validators for queries, dates, coordinates, alerts   | `backend/utils/validators.py`           |
-| **Testing**                   | 68 pytest tests (backend) + Vitest integration tests (frontend) | `backend/tests/`, `frontend/src/tests/` |
+| **TypeScript**                | Entire frontend in strict TypeScript — all components, hooks, contexts, utils, and types | `frontend/tsconfig.json`, `frontend/src/` |
+| **Testing**                   | 68 pytest tests (backend) + Vitest unit tests + Playwright E2E tests | `backend/tests/`, `frontend/src/tests/`, `frontend/e2e/` |
 | **Error handling**            | Custom exceptions, ErrorBoundary, Toast notifications      | Throughout                              |
 | **Security**                  | Rate limiting, CORS restriction, env-based secrets, input sanitization, prompt injection defense | `backend/config.py`, `backend/services/ai_service.py` |
 | **Export/reporting**          | 5 formats: JSON, CSV, Markdown, XML, PDF (with ReportLab) | `backend/services/export_service.py`    |
@@ -170,6 +169,7 @@ Open **http://localhost:5173** — the app works immediately with realistic demo
 | **SQLite over PostgreSQL** | Zero-config setup — reviewers can clone and run immediately. WAL mode handles concurrent reads. |
 | **React + Vite over Next.js** | SPA with no SSR needs. Vite gives fast HMR without Next.js complexity. |
 | **Claude over GPT** | Demonstrates familiarity with Anthropic's ecosystem for an AI-focused role. |
+| **Strict TypeScript** | Every component, hook, context, and utility is typed with `strict: true` — no `any` escape hatches. |
 | **Raw SQL over SQLAlchemy** | Shows SQL fundamentals. Schema is simple enough that an ORM adds complexity without value. |
 | **Flasgger for API docs** | Interactive Swagger UI at `/docs` — reviewers can test endpoints without Postman. |
 
@@ -197,16 +197,34 @@ Push to GitHub, connect Render. Config in `render.yaml`. Secret key auto-generat
 ## Running Tests
 
 ```bash
-# Backend (68 tests)
-python -m pytest backend/tests/ -v
+# Quick: run everything
+make test
 
-# Frontend
-cd frontend
-npm install
-npm test
+# Backend (68 tests)
+make test-backend
+
+# Frontend unit tests (Vitest)
+make test-frontend
+
+# E2E tests (Playwright — requires backend + frontend running)
+make test-e2e
 ```
 
-CI runs automatically on push/PR via GitHub Actions.
+CI runs automatically on push/PR via GitHub Actions (3 jobs: backend, frontend, E2E).
+
+## Developer Commands
+
+```bash
+make help        # Show all available commands
+make install     # Install all dependencies (pip + npm)
+make dev         # Start backend + frontend together
+make test        # Run all tests
+make typecheck   # Run strict TypeScript type checker
+make lint        # Lint frontend
+make build       # Production build
+make docker      # Build and run Docker container
+make clean       # Remove build artifacts
+```
 
 ---
 
@@ -268,13 +286,11 @@ Copy `.env.example` to `.env`. With `DEMO_MODE=true`, no API keys are needed.
 
 ## What I'd Improve With More Time
 
-1. **TypeScript** — Convert the frontend for type safety across 30+ components.
-2. **Authentication** — JWT-based user accounts so searches are per-user.
-3. **WebSocket live updates** — Push weather alerts in real-time.
-4. **Database migrations** — Alembic for schema versioning.
-5. **E2E tests** — Playwright for the full search → save → export flow.
-6. **Redis cache** — Replace SimpleCache for production.
-7. **Pagination** — Cursor-based pagination on the searches endpoint.
+1. **Authentication** — JWT-based user accounts so searches are per-user.
+2. **WebSocket live updates** — Push weather alerts in real-time instead of polling.
+3. **Database migrations** — Alembic for schema versioning.
+4. **Redis cache** — Replace SimpleCache for production deployments.
+5. **i18n** — Full frontend internationalization beyond AI briefing language toggle.
 
 ---
 
