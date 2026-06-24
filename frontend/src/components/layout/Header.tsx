@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useWeather } from '../../context/WeatherContext';
 
 export default function Header() {
-  const { clearWeather } = useWeather();
+  const { clearWeather, weather, searchWeather } = useWeather();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -37,17 +37,30 @@ export default function Header() {
         <span style={{ fontWeight: 600, letterSpacing: '-0.01em', fontSize: 15, color: 'var(--text)' }}>SkyPulse</span>
       </button>
       <nav style={{ display: 'flex', gap: 4 }}>
-        {['Forecast', 'AI Insights', 'Saved'].map(label => (
-          <a key={label} href={`#${label.toLowerCase().replace(' ','-')}`} style={{
-            fontSize: 13.5, color: 'var(--muted)', padding: '8px 12px', borderRadius: 6,
-            transition: 'color .15s, background .15s',
-          }}
-            onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
-            onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
-          >
-            {label}
-          </a>
-        ))}
+        {['Forecast', 'AI Insights', 'Saved'].map(label => {
+          const targetId = label.toLowerCase().replace(' ', '-');
+          const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+            e.preventDefault();
+            const el = document.getElementById(targetId);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth' });
+            } else if (!weather) {
+              searchWeather('New York');
+              setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' }), 1500);
+            }
+          };
+          return (
+            <a key={label} href={`#${targetId}`} onClick={handleClick} style={{
+              fontSize: 13.5, color: 'var(--muted)', padding: '8px 12px', borderRadius: 6,
+              transition: 'color .15s, background .15s', textDecoration: 'none',
+            }}
+              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
+            >
+              {label}
+            </a>
+          );
+        })}
       </nav>
     </header>
   );
