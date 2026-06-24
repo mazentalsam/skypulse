@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: skypulse
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        value: "https://skypulse.onrender.com"
+    healthCheckPath: /api/health
