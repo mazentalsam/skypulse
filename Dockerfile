@@ -10,7 +10,7 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends nginx && \
+RUN apt-get update && apt-get install -y --no-install-recommends nginx gettext-base && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
@@ -25,6 +25,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
-EXPOSE 5000 80
+EXPOSE ${PORT:-80} 5000
 
 CMD ["./entrypoint.sh"]
