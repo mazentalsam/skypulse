@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useWeather } from '../../context/WeatherContext';
 
 export default function Header() {
+  const { clearWeather } = useWeather();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function Header() {
       borderBottom: scrolled ? '1px solid rgba(255,255,255,.04)' : '1px solid transparent',
       transition: 'all .2s ease',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <button onClick={() => { clearWeather(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
         <div style={{
           width: 22, height: 22, borderRadius: 6,
           background: 'linear-gradient(135deg, #3b82f6, #0ea5e9)',
@@ -32,8 +34,8 @@ export default function Header() {
             background: 'rgba(255,255,255,.85)', mixBlendMode: 'overlay',
           }} />
         </div>
-        <span style={{ fontWeight: 600, letterSpacing: '-0.01em', fontSize: 15 }}>SkyPulse</span>
-      </div>
+        <span style={{ fontWeight: 600, letterSpacing: '-0.01em', fontSize: 15, color: 'var(--text)' }}>SkyPulse</span>
+      </button>
       <nav style={{ display: 'flex', gap: 4 }}>
         {['Forecast', 'AI Insights', 'Saved'].map(label => (
           <a key={label} href={`#${label.toLowerCase().replace(' ','-')}`} style={{

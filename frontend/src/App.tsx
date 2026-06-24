@@ -101,7 +101,7 @@ function AppContent() {
           </div>
 
           {/* ── AI Insights ── */}
-          <div style={{ ...W, marginTop: S }}>
+          <div id="ai-insights" style={{ ...W, marginTop: S, scrollMarginTop: 80 }}>
             <Label>AI insights</Label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="grid-responsive">
               <ErrorBoundary fallbackMessage="Unavailable"><AIWeatherNarrator /></ErrorBoundary>
@@ -114,7 +114,7 @@ function AppContent() {
           </div>
 
           {/* ── Forecast ── */}
-          <div style={{ ...W, marginTop: S }}>
+          <div id="forecast" style={{ ...W, marginTop: S, scrollMarginTop: 80 }}>
             <Label>Forecast</Label>
             <ForecastRow />
             <div style={{ marginTop: 16 }}><HourlyChart /></div>
@@ -152,7 +152,7 @@ function AppContent() {
           </div>
 
           {/* ── Data ── */}
-          <div style={{ ...W, marginTop: S }}>
+          <div id="saved" style={{ ...W, marginTop: S, scrollMarginTop: 80 }}>
             <Label>Data</Label>
             <DateRangeSearch />
             <div style={{ marginTop: 16 }}><SavedSearchesPanel /></div>
