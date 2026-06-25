@@ -36,6 +36,43 @@ export const fetchHistorical = (lat: number, lon: number) => request<HistoricalD
 
 export const fetchAIBriefing = (weatherData: WeatherData, locationName: string, language = 'en') =>
   request<{ briefing: string }>('post', '/ai/briefing', { weather_data: weatherData, location_name: locationName, language });
+
+export async function streamAIBriefing(
+  weatherData: WeatherData,
+  locationName: string,
+  language: string,
+  onChunk: (text: string) => void,
+  onDone: () => void,
+): Promise<void> {
+  try {
+    const resp = await fetch('/api/ai/briefing/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weather_data: weatherData, location_name: locationName, language }),
+    });
+    const reader = resp.body?.getReader();
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') { onDone(); return; }
+          onChunk(data);
+        }
+      }
+    }
+    onDone();
+  } catch {
+    onDone();
+  }
+}
 export const fetchTripAdvice = (destination: string, dates: string, weatherData: WeatherData) =>
   request<Record<string, unknown>>('post', '/ai/trip-advice', { destination, dates, weather_data: weatherData });
 export const fetchOutfitRecommendation = (weatherData: WeatherData) =>

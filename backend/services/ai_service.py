@@ -42,7 +42,8 @@ def _get_client():
     return _client
 
 
-MODEL = 'claude-sonnet-4-6'
+MODEL_HEAVY = 'claude-sonnet-4-6'
+MODEL_FAST = 'claude-haiku-4-5-20251001'
 
 
 def _parse_json(text):
@@ -79,7 +80,7 @@ def generate_weather_briefing(weather_data, location_name='', language='en'):
         client = _get_client()
         weather_str = json.dumps(weather_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_HEAVY,
             max_tokens=300,
             system=f'You are a concise, engaging weather narrator. Generate a 3-4 sentence natural language weather briefing that highlights non-obvious insights a commuter or traveler would care about. Include wind chill effects, UV warnings, or timing advice. Be specific with numbers.{lang_instruction}',
             messages=[{
@@ -91,6 +92,32 @@ def generate_weather_briefing(weather_data, location_name='', language='en'):
     except Exception as e:
         logger.error('AI briefing failed: %s', e)
         return ''
+
+
+def stream_weather_briefing(weather_data, location_name='', language='en'):
+    location_name = _sanitize(location_name)
+    lang_instruction = ''
+    if language != 'en':
+        lang_map = {'es': 'Spanish', 'fr': 'French', 'ja': 'Japanese', 'de': 'German', 'pt': 'Portuguese', 'zh': 'Chinese'}
+        lang_instruction = f' Respond entirely in {lang_map.get(language, language)}.'
+
+    try:
+        client = _get_client()
+        weather_str = json.dumps(weather_data, indent=2)
+        with client.messages.stream(
+            model=MODEL_HEAVY,
+            max_tokens=300,
+            system=f'You are a concise, engaging weather narrator. Generate a 3-4 sentence natural language weather briefing that highlights non-obvious insights a commuter or traveler would care about. Include wind chill effects, UV warnings, or timing advice. Be specific with numbers.{lang_instruction}',
+            messages=[{
+                'role': 'user',
+                'content': f'Generate a weather briefing for {location_name}:\n{weather_str}'
+            }],
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
+    except Exception as e:
+        logger.error('AI streaming briefing failed: %s', e)
+        yield ''
 
 
 def generate_trip_advice(destination, dates, weather_data):
@@ -106,7 +133,7 @@ def generate_trip_advice(destination, dates, weather_data):
         client = _get_client()
         weather_str = json.dumps(weather_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_HEAVY,
             max_tokens=500,
             system='You are a travel weather advisor. Given destination weather data, return JSON with: best_days (array of strings), packing_list (array of strings), activities_to_avoid (array of strings), local_tip (string). Be specific and practical.',
             messages=[{
@@ -128,7 +155,7 @@ def generate_outfit_recommendation(weather_data):
         client = _get_client()
         weather_str = json.dumps(weather_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_FAST,
             max_tokens=300,
             system='You are a weather-based outfit advisor. Given weather conditions, return JSON with a "recommendations" array of exactly 3 objects, each with: icon (single emoji), label (2-4 words), description (one sentence). Focus on practical, non-obvious advice.',
             messages=[{
@@ -150,7 +177,7 @@ def generate_smart_alerts(forecast_data):
         client = _get_client()
         forecast_str = json.dumps(forecast_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_FAST,
             max_tokens=400,
             system='You are a weather risk analyst. Analyze 5-day forecast data and identify non-obvious risks users might miss. Return a JSON array of alert objects with: type (uv/rain/temperature/wind), severity (low/moderate/high), message (one specific actionable sentence). Only include genuine risks, max 4 alerts.',
             messages=[{
@@ -172,7 +199,7 @@ def generate_mood_score(weather_data):
         client = _get_client()
         weather_str = json.dumps(weather_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_FAST,
             max_tokens=150,
             system='You are a weather mood scorer. Rate the weather on a scale of 1-10 (10 = perfect outdoor day, 1 = stay inside). Return JSON with: score (integer 1-10), explanation (one sentence explaining the score). Consider temperature comfort, rain, wind, and UV.',
             messages=[{
@@ -197,7 +224,7 @@ def parse_natural_language_query(query):
     try:
         client = _get_client()
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_FAST,
             max_tokens=150,
             system='Extract weather query intent. Return JSON with: intent (weather_check/forecast_check/activity_check), location (city or place name), date_hint (today/tomorrow/weekend/specific date or null). If location is unclear, use the most likely city.',
             messages=[{
@@ -224,7 +251,7 @@ def generate_natural_language_answer(query, weather_data, location_name=''):
         client = _get_client()
         weather_str = json.dumps(weather_data, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_HEAVY,
             max_tokens=300,
             system='You are a conversational weather assistant. Answer the user\'s weather question directly and naturally using the provided data. Be specific with numbers and give actionable advice. Keep it to 2-4 sentences.',
             messages=[{
@@ -253,7 +280,7 @@ def plan_my_week(schedule, forecast_data, location_name=''):
         forecast_str = json.dumps(forecast_data, indent=2)
         schedule_str = json.dumps(schedule, indent=2)
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_HEAVY,
             max_tokens=500,
             system='You are a weather-aware schedule advisor. Given a user\'s weekly schedule and forecast data, evaluate each event. Return a JSON array of objects with: event (string), day (string), time (string), verdict (good/warning/bad), reason (one specific sentence with numbers). Be honest about risks.',
             messages=[{
@@ -274,7 +301,7 @@ def generate_comparison_insight(city1_data, city2_data):
     try:
         client = _get_client()
         response = client.messages.create(
-            model=MODEL,
+            model=MODEL_HEAVY,
             max_tokens=250,
             system='You are a weather comparison analyst. Given two cities\' weather data, write 2-3 sentences comparing them practically. Highlight which city is better for outdoor activities right now, and any non-obvious differences (humidity, UV, wind). Be specific with numbers.',
             messages=[{

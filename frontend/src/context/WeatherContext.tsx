@@ -94,13 +94,18 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
 
     dispatch({ type: 'SET_AI_LOADING', payload: true });
 
+    let briefingText = '';
+    api.streamAIBriefing(
+      weather, cityName, 'en',
+      (chunk) => { briefingText += chunk; dispatch({ type: 'SET_AI', key: 'aiBriefing', payload: briefingText }); },
+      () => {},
+    );
+
     Promise.all([
-      api.fetchAIBriefing(weather, cityName),
       api.fetchOutfitRecommendation(weather),
       api.fetchMoodScore(weather),
       forecastRes.data ? api.fetchSmartAlerts(forecastRes.data) : Promise.resolve({ data: null, error: null, headers: null }),
-    ]).then(([briefingRes, outfitRes, moodRes, alertsRes]) => {
-      if (briefingRes.data) dispatch({ type: 'SET_AI', key: 'aiBriefing', payload: briefingRes.data.briefing });
+    ]).then(([outfitRes, moodRes, alertsRes]) => {
       if (outfitRes.data) dispatch({ type: 'SET_AI', key: 'outfit', payload: outfitRes.data });
       if (moodRes.data) dispatch({ type: 'SET_AI', key: 'mood', payload: moodRes.data });
       if (alertsRes.data) dispatch({ type: 'SET_AI', key: 'smartAlerts', payload: alertsRes.data.alerts });

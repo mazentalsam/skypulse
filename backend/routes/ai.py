@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, Response
 from backend.extensions import cache
+from backend import config
 from backend.services import ai_service
 from backend.services.geocoding_service import geocode, LocationNotFoundError
 from backend.services.weather_service import get_current_weather, get_forecast, WeatherAPIError
@@ -30,6 +31,32 @@ def ai_briefing():
     cache.set(cache_key, briefing, timeout=600)
     resp = make_response(jsonify({'briefing': briefing}))
     return _add_cache_header(resp, hit=False)
+
+
+@ai_bp.route('/ai/briefing/stream', methods=['POST'])
+def ai_briefing_stream():
+    data = request.get_json()
+    if not data or not data.get('weather_data'):
+        return jsonify({'error': 'weather_data is required'}), 400
+
+    location_name = data.get('location_name', '')
+    language = data.get('language', 'en')
+
+    if config.DEMO_MODE:
+        briefing = ai_service.generate_weather_briefing(data['weather_data'], location_name, language)
+        def demo_stream():
+            words = briefing.split(' ')
+            for word in words:
+                yield f"data: {word} \n\n"
+            yield "data: [DONE]\n\n"
+        return Response(demo_stream(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+    def generate():
+        for chunk in ai_service.stream_weather_briefing(data['weather_data'], location_name, language):
+            yield f"data: {chunk}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
 @ai_bp.route('/ai/trip-advice', methods=['POST'])
