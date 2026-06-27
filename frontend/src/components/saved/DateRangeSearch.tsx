@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader, Search } from 'lucide-react';
-import { createDateRangeSearch } from '../../api/client';
+import { Loader, Search, Download } from 'lucide-react';
+import { createDateRangeSearch, getExportUrl } from '../../api/client';
 import { useSavedSearches } from '../../context/SavedSearchesContext';
 import { formatTemp } from '../../utils/formatters';
 import type { SavedSearch } from '../../types/weather';
@@ -138,6 +138,19 @@ export default function DateRangeSearch() {
             padding: '5px 10px', borderRadius: 6, fontSize: 12,
             background: 'rgba(20,184,166,.06)', border: '1px solid rgba(20,184,166,.15)', color: 'var(--teal)',
           }}>✓ Saved</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['json', 'csv', 'pdf'].map(f => (
+              <a key={f} href={getExportUrl(result.id, f)} download style={{
+                padding: '5px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 500,
+                border: '1px solid var(--border-strong)', background: 'transparent',
+                color: 'var(--text)', textDecoration: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                transition: 'background .15s',
+              }}>
+                <Download size={11} /> {f.toUpperCase()}
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>
