@@ -4,10 +4,11 @@ import json
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 
 
 def export_json(record):
@@ -158,120 +159,235 @@ def _format_date_range(record):
     return str(record.get('created_at', ''))[:10]
 
 
+def _round_val(val):
+    if val is None:
+        return 'N/A'
+    try:
+        return str(round(float(val)))
+    except (ValueError, TypeError):
+        return str(val)
+
+
+def _build_stat_card(label, value, unit=''):
+    label_style = ParagraphStyle('StatLabel', fontSize=8, textColor=colors.HexColor('#94a3b8'),
+                                  fontName='Helvetica', alignment=TA_CENTER, leading=10)
+    value_style = ParagraphStyle('StatValue', fontSize=22, textColor=colors.white,
+                                  fontName='Helvetica-Bold', alignment=TA_CENTER, leading=26)
+    unit_style = ParagraphStyle('StatUnit', fontSize=8, textColor=colors.HexColor('#64748b'),
+                                 fontName='Helvetica', alignment=TA_CENTER, leading=10)
+    cell = [[Paragraph(label.upper(), label_style)],
+            [Paragraph(str(value), value_style)],
+            [Paragraph(unit, unit_style)]]
+    t = Table(cell, colWidths=[1.55 * inch], rowHeights=[14, 30, 14])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#1e293b')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('ROUNDEDCORNERS', [6, 6, 6, 6]),
+    ]))
+    return t
+
+
 def export_pdf(records):
     if not isinstance(records, list):
         records = [records]
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5 * inch, bottomMargin=0.5 * inch,
-                            leftMargin=0.6 * inch, rightMargin=0.6 * inch)
+    page_w = letter[0]
+    margin = 0.6 * inch
+    content_w = page_w - 2 * margin
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0, bottomMargin=0.4 * inch,
+                            leftMargin=margin, rightMargin=margin)
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle(
-        'CustomTitle', parent=styles['Title'],
-        fontSize=22, spaceAfter=4, textColor=colors.HexColor('#0f172a'),
-    )
-    subtitle_style = ParagraphStyle(
-        'Subtitle', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor('#64748b'), spaceAfter=6,
-    )
-    section_style = ParagraphStyle(
-        'Section', parent=styles['Heading2'],
-        fontSize=13, spaceBefore=16, spaceAfter=8, textColor=colors.HexColor('#1e293b'),
-    )
-    detail_style = ParagraphStyle(
-        'Detail', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor('#334155'), leading=14,
-    )
-    note_style = ParagraphStyle(
-        'Note', parent=styles['Normal'],
-        fontSize=9, textColor=colors.HexColor('#64748b'), leading=13, leftIndent=8,
-        borderPadding=(4, 4, 4, 4),
-    )
-
     story = []
-    story.append(Paragraph('SkyPulse Weather Report', title_style))
-    story.append(Paragraph('Built by Mazen | PM Accelerator AI Engineer Assessment', subtitle_style))
 
-    divider_data = [[''] ]
-    divider = Table(divider_data, colWidths=[6.8 * inch])
-    divider.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#e2e8f0')),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    # ── Dark header banner ──
+    header_title = ParagraphStyle('HTitle', fontSize=26, textColor=colors.white,
+                                   fontName='Helvetica-Bold', alignment=TA_LEFT, leading=32)
+    header_sub = ParagraphStyle('HSub', fontSize=10, textColor=colors.HexColor('#94a3b8'),
+                                 fontName='Helvetica', alignment=TA_LEFT, leading=14)
+    header_cell = [
+        [Paragraph('SkyPulse', header_title)],
+        [Paragraph('Weather Report', ParagraphStyle('HTitle2', fontSize=16, textColor=colors.HexColor('#38bdf8'),
+                                                      fontName='Helvetica', alignment=TA_LEFT, leading=20))],
+        [Spacer(1, 4)],
+        [Paragraph('Built by Mazen  |  PM Accelerator AI Engineer Assessment', header_sub)],
+    ]
+    header = Table(header_cell, colWidths=[content_w])
+    header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#0f172a')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 24),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 24),
+        ('TOPPADDING', (0, 0), (0, 0), 28),
+        ('BOTTOMPADDING', (-1, -1), (-1, -1), 24),
     ]))
-    story.append(divider)
+    story.append(header)
+    story.append(Spacer(1, 20))
 
-    table_data = [['City', 'Country', 'Temp (°C)', 'Feels Like', 'Humidity', 'Wind', 'Conditions', 'Date Range']]
-    for r in records:
+    # ── Per-city sections ──
+    for idx, r in enumerate(records):
         weather = r.get('weather_data', {})
         main = weather.get('main', {}) if isinstance(weather, dict) else {}
-        wind = weather.get('wind', {}) if isinstance(weather, dict) else {}
-        desc = weather.get('weather', [{}])[0].get('description', '') if isinstance(weather, dict) else ''
-        table_data.append([
-            r.get('city', ''),
-            r.get('country', ''),
-            f'{main.get("temp", "N/A")}°' if main.get('temp') is not None else 'N/A',
-            f'{main.get("feels_like", "N/A")}°' if main.get('feels_like') is not None else 'N/A',
-            f'{main.get("humidity", "N/A")}%' if main.get('humidity') is not None else 'N/A',
-            f'{wind.get("speed", "N/A")} m/s' if wind.get('speed') is not None else 'N/A',
-            desc.capitalize() if desc else '—',
-            _format_date_range(r),
-        ])
+        wind_data = weather.get('wind', {}) if isinstance(weather, dict) else {}
+        desc_list = weather.get('weather', [{}]) if isinstance(weather, dict) else [{}]
+        desc = desc_list[0].get('description', '') if desc_list else ''
 
-    if len(table_data) > 1:
-        story.append(Paragraph('Overview', section_style))
-        col_widths = [0.9 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 1.1 * inch, 1.3 * inch]
-        table = Table(table_data, repeatRows=1, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTSIZE', (0, 0), (-1, 0), 8.5),
+        city = r.get('city', 'Unknown')
+        country = r.get('country', '')
+        date_label = _format_date_range(r)
+
+        # City header bar
+        city_title = ParagraphStyle('CityTitle', fontSize=18, textColor=colors.HexColor('#0f172a'),
+                                     fontName='Helvetica-Bold', leading=22)
+        city_meta = ParagraphStyle('CityMeta', fontSize=9, textColor=colors.HexColor('#64748b'),
+                                    fontName='Helvetica', leading=12)
+        location_label = f'{city}, {country}' if country else city
+        city_header = Table(
+            [[Paragraph(location_label, city_title), Paragraph(date_label, ParagraphStyle(
+                'DateRight', fontSize=9, textColor=colors.HexColor('#64748b'),
+                fontName='Helvetica', alignment=2, leading=12))]],
+            colWidths=[content_w * 0.6, content_w * 0.4],
+        )
+        city_header.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(city_header)
+
+        # Accent line
+        story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#38bdf8'),
+                                 spaceAfter=14, spaceBefore=4))
+
+        # Big temperature + condition
+        temp_val = _round_val(main.get('temp'))
+        temp_display = f'{temp_val}°C' if temp_val != 'N/A' else 'N/A'
+        big_temp = ParagraphStyle('BigTemp', fontSize=48, textColor=colors.HexColor('#0f172a'),
+                                   fontName='Helvetica-Bold', alignment=TA_LEFT, leading=52)
+        cond_style = ParagraphStyle('Cond', fontSize=14, textColor=colors.HexColor('#64748b'),
+                                     fontName='Helvetica', alignment=TA_LEFT, leading=18)
+        temp_block = Table(
+            [[Paragraph(temp_display, big_temp)],
+             [Paragraph(desc.capitalize() if desc else '—', cond_style)]],
+            colWidths=[content_w],
+        )
+        temp_block.setStyle(TableStyle([
+            ('BOTTOMPADDING', (0, 0), (0, 0), 2),
+            ('TOPPADDING', (0, 1), (0, 1), 0),
+        ]))
+        story.append(temp_block)
+        story.append(Spacer(1, 16))
+
+        # Stat cards row
+        feels = _round_val(main.get('feels_like'))
+        humidity = _round_val(main.get('humidity'))
+        wind_speed = _round_val(wind_data.get('speed'))
+        visibility = weather.get('visibility') if isinstance(weather, dict) else None
+        vis_val = _round_val(visibility / 1000 if visibility else None)
+
+        cards = [
+            _build_stat_card('Feels Like', f'{feels}°', 'Celsius'),
+            _build_stat_card('Humidity', f'{humidity}', 'Percent'),
+            _build_stat_card('Wind', f'{wind_speed}', 'm/s'),
+            _build_stat_card('Visibility', f'{vis_val}', 'km'),
+        ]
+        card_row = Table([cards], colWidths=[content_w / 4] * 4)
+        card_row.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(card_row)
+        story.append(Spacer(1, 16))
+
+        # Details table
+        detail_rows = [
+            ['Metric', 'Value'],
+            ['Temperature', f'{temp_val}°C'],
+            ['Feels Like', f'{feels}°C'],
+            ['Humidity', f'{humidity}%'],
+            ['Wind Speed', f'{wind_speed} m/s'],
+            ['Visibility', f'{vis_val} km'],
+            ['Condition', desc.capitalize() if desc else '—'],
+            ['Pressure', f'{_round_val(main.get("pressure"))} hPa'],
+        ]
+        detail_table = Table(detail_rows, colWidths=[content_w * 0.4, content_w * 0.6])
+        detail_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (2, 0), (5, -1), 'CENTER'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8.5),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#334155')),
+            ('FONTSIZE', (0, 1), (-1, -1), 9.5),
+            ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#64748b')),
+            ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#0f172a')),
+            ('FONTNAME', (1, 1), (1, -1), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
             ('TOPPADDING', (0, 0), (-1, -1), 7),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
-        story.append(table)
-        story.append(Spacer(1, 16))
+        story.append(detail_table)
+        story.append(Spacer(1, 12))
 
-    for r in records:
-        has_details = r.get('ai_briefing') or r.get('notes') or r.get('mood_score')
-        if not has_details:
-            continue
-        city_label = r.get('city', 'Unknown')
-        date_label = _format_date_range(r)
-        story.append(Paragraph(f'{city_label} — {date_label}', section_style))
-
+        # Notes / AI briefing
         if r.get('notes'):
             notes_text = r['notes']
             if not notes_text.startswith('Date range search:'):
-                story.append(Paragraph(f'<b>Notes:</b> {notes_text}', detail_style))
-                story.append(Spacer(1, 4))
+                note_label = ParagraphStyle('NoteLabel', fontSize=10, textColor=colors.HexColor('#334155'),
+                                             fontName='Helvetica-Bold', leading=14)
+                note_body = ParagraphStyle('NoteBody', fontSize=9.5, textColor=colors.HexColor('#475569'),
+                                            fontName='Helvetica', leading=14, leftIndent=8)
+                story.append(Paragraph('Notes', note_label))
+                story.append(Spacer(1, 2))
+                story.append(Paragraph(notes_text, note_body))
+                story.append(Spacer(1, 8))
 
         if r.get('mood_score'):
-            story.append(Paragraph(f'<b>Weather Mood Score:</b> {r["mood_score"]}/10', detail_style))
-            story.append(Spacer(1, 4))
-
-        if r.get('ai_briefing'):
-            story.append(Paragraph('<b>AI Weather Briefing:</b>', detail_style))
-            story.append(Spacer(1, 2))
-            story.append(Paragraph(r['ai_briefing'], note_style))
+            mood_style = ParagraphStyle('Mood', fontSize=10, textColor=colors.HexColor('#334155'),
+                                         fontName='Helvetica', leading=14)
+            story.append(Paragraph(f'<b>Weather Mood Score:</b>  {r["mood_score"]} / 10', mood_style))
             story.append(Spacer(1, 8))
 
-    story.append(Spacer(1, 20))
-    footer_style = ParagraphStyle(
-        'Footer', parent=styles['Normal'],
-        fontSize=8, textColor=colors.HexColor('#94a3b8'), alignment=1,
-    )
-    story.append(Paragraph('Generated by SkyPulse — Built by Mazen for PM Accelerator', footer_style))
+        if r.get('ai_briefing'):
+            ai_label = ParagraphStyle('AILabel', fontSize=11, textColor=colors.HexColor('#0f172a'),
+                                       fontName='Helvetica-Bold', leading=14, spaceBefore=4)
+            ai_body = ParagraphStyle('AIBody', fontSize=9.5, textColor=colors.HexColor('#475569'),
+                                      fontName='Helvetica', leading=14, leftIndent=10, rightIndent=10,
+                                      spaceBefore=4, spaceAfter=4)
+            story.append(Paragraph('AI Weather Briefing', ai_label))
+            # Briefing in a tinted box
+            briefing_cell = [[Paragraph(r['ai_briefing'], ai_body)]]
+            briefing_box = Table(briefing_cell, colWidths=[content_w - 8])
+            briefing_box.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f9ff')),
+                ('ROUNDEDCORNERS', [6, 6, 6, 6]),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ]))
+            story.append(briefing_box)
+            story.append(Spacer(1, 12))
+
+        if idx < len(records) - 1:
+            story.append(Spacer(1, 8))
+            story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#cbd5e1'),
+                                     spaceAfter=16, spaceBefore=8))
+
+    # ── Footer ──
+    story.append(Spacer(1, 24))
+    footer_style = ParagraphStyle('Footer', fontSize=8, textColor=colors.HexColor('#94a3b8'),
+                                   fontName='Helvetica', alignment=TA_CENTER, leading=11)
+    story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#e2e8f0'),
+                             spaceAfter=8))
+    story.append(Paragraph('Generated by SkyPulse  —  Built by Mazen for PM Accelerator', footer_style))
 
     doc.build(story)
     buffer.seek(0)
