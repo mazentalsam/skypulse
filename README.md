@@ -11,6 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=flat-square&logo=typescript)
 ![Tests](https://img.shields.io/badge/Tests-68_passing-34D399?style=flat-square)
 ![Playwright](https://img.shields.io/badge/E2E-Playwright-2EAD33?style=flat-square&logo=playwright)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 A full-stack weather platform that combines real-time forecasts with Claude AI insights — built by **Mazen** for the **PM Accelerator AI Engineer Intern** technical assessment. Covers **both** Tech Assessment #1 (Frontend) and #2 (Backend) for Full Stack candidacy.
 
