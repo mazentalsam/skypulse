@@ -159,11 +159,14 @@ def _format_date_range(record):
     return str(record.get('created_at', ''))[:10]
 
 
-def _round_val(val):
+def _fmt_val(val, decimals=1):
     if val is None:
         return 'N/A'
     try:
-        return str(round(float(val)))
+        f = float(val)
+        if f == int(f) and decimals <= 1:
+            return str(int(f))
+        return f'{f:.{decimals}f}'
     except (ValueError, TypeError):
         return str(val)
 
@@ -178,7 +181,7 @@ def _build_stat_card(label, value, unit=''):
     cell = [[Paragraph(label.upper(), label_style)],
             [Paragraph(str(value), value_style)],
             [Paragraph(unit, unit_style)]]
-    t = Table(cell, colWidths=[1.55 * inch], rowHeights=[14, 30, 14])
+    t = Table(cell, colWidths=[1.2 * inch], rowHeights=[14, 30, 14])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#1e293b')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -264,7 +267,7 @@ def export_pdf(records):
                                  spaceAfter=14, spaceBefore=4))
 
         # Big temperature + condition
-        temp_val = _round_val(main.get('temp'))
+        temp_val = _fmt_val(main.get('temp'))
         temp_display = f'{temp_val}°C' if temp_val != 'N/A' else 'N/A'
         big_temp = ParagraphStyle('BigTemp', fontSize=48, textColor=colors.HexColor('#0f172a'),
                                    fontName='Helvetica-Bold', alignment=TA_LEFT, leading=52)
@@ -282,20 +285,22 @@ def export_pdf(records):
         story.append(temp_block)
         story.append(Spacer(1, 16))
 
-        # Stat cards row
-        feels = _round_val(main.get('feels_like'))
-        humidity = _round_val(main.get('humidity'))
-        wind_speed = _round_val(wind_data.get('speed'))
+        # Stat cards row — precise values matching the app
+        feels = _fmt_val(main.get('feels_like'))
+        humidity = _fmt_val(main.get('humidity'), 0)
+        wind_speed = _fmt_val(wind_data.get('speed'), 2)
+        pressure = _fmt_val(main.get('pressure'), 0)
         visibility = weather.get('visibility') if isinstance(weather, dict) else None
-        vis_val = _round_val(visibility / 1000 if visibility else None)
+        vis_val = _fmt_val(visibility / 1000 if visibility else None)
 
         cards = [
             _build_stat_card('Feels Like', f'{feels}°', 'Celsius'),
-            _build_stat_card('Humidity', f'{humidity}', 'Percent'),
-            _build_stat_card('Wind', f'{wind_speed}', 'm/s'),
-            _build_stat_card('Visibility', f'{vis_val}', 'km'),
+            _build_stat_card('Humidity', f'{humidity}%', ''),
+            _build_stat_card('Wind', wind_speed, 'm/s'),
+            _build_stat_card('Visibility', vis_val, 'km'),
+            _build_stat_card('Pressure', pressure, 'hPa'),
         ]
-        card_row = Table([cards], colWidths=[content_w / 4] * 4)
+        card_row = Table([cards], colWidths=[content_w / 5] * 5)
         card_row.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -304,37 +309,6 @@ def export_pdf(records):
         ]))
         story.append(card_row)
         story.append(Spacer(1, 16))
-
-        # Details table
-        detail_rows = [
-            ['Metric', 'Value'],
-            ['Temperature', f'{temp_val}°C'],
-            ['Feels Like', f'{feels}°C'],
-            ['Humidity', f'{humidity}%'],
-            ['Wind Speed', f'{wind_speed} m/s'],
-            ['Visibility', f'{vis_val} km'],
-            ['Condition', desc.capitalize() if desc else '—'],
-            ['Pressure', f'{_round_val(main.get("pressure"))} hPa'],
-        ]
-        detail_table = Table(detail_rows, colWidths=[content_w * 0.4, content_w * 0.6])
-        detail_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#334155')),
-            ('FONTSIZE', (0, 1), (-1, -1), 9.5),
-            ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#64748b')),
-            ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#0f172a')),
-            ('FONTNAME', (1, 1), (1, -1), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
-            ('TOPPADDING', (0, 0), (-1, -1), 7),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        story.append(detail_table)
-        story.append(Spacer(1, 12))
 
         # Notes / AI briefing
         if r.get('notes'):
